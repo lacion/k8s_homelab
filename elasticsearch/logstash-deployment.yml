@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: logstash
+---
+apiVersion: v1
+data:
+  logstash.conf: "input {\r\n    syslog  {\r\n        port => \"2500\"\r\n    }\r\n}\r\n\r\noutput
+    {\r\n    elasticsearch {\r\n        hosts=>\"http://elasticsearch:9200\"\r\n
+    \   }\r\n}\r\n"
+kind: ConfigMap
+metadata:
+  name: logstash-configmap
+  namespace: logstash
+  selfLink: /api/v1/namespaces/logstash/configmaps/logstash-configmap
+---
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: logstash
+  namespace: logstash
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: logstash
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      name: logstash
+      labels:
+        app: logstash
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            preference:
+              matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                - kubeworker
+      containers:
+      - image: docker.elastic.co/logstash/logstash-oss:6.2.2
+        name: logstash
+        ports:
+        - containerPort: 2500
+        args:
+          - "-f"
+          - "/config-dir"
+        volumeMounts:
+          - mountPath: "/config-dir"
+            name: "config-dir"
+      volumes:
+        - name: "config-dir"
+          configMap:
+            name: logstash-configmap
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: logstash
+  namespace: logstash
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 2500
+    targetPort: 2500
+  selector:
+    app: logstash
