@@ -1,0 +1,24 @@
+apiVersion: kubedb.com/v1alpha1
+kind: Postgres
+metadata:
+  name: postgres
+  namespace: databases
+spec:
+  version: 10.2
+  storage:
+    storageClassName: rook-block
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 50Gi
+  nodeSelector:
+    kubernetes.io/hostname: kubeworker
+  doNotPause: true
+  monitor:
+    agent: prometheus.io/coreos-operator
+    prometheus:
+      namespace: monitoring
+      labels:
+        app: kubedb
+      interval: 10s
