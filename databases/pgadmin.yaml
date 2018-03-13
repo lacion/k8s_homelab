@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgadmin-env
+  namespace: databases
+data:
+  SERVER_MODE: "true"
+  PGADMIN_SETUP_EMAIL: "admin@mail"
+  PGADMIN_SETUP_PASSWORD: "pgadmin_password"
+  MAIL_SERVER: "smtp.host"
+  MAIL_PORT: "465"
+  MAIL_USE_SSL: "yes"
+  MAIL_USE_TLS: "yes"
+  MAIL_USERNAME: "admin@mail"
+  MAIL_PASSWORD: "mail_password"
+---
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: pgadmin4
+  namespace: databases
+  labels:
+    app: pgadmin
+    name: pgadmin4
+spec:
+  serviceName: pgadmin4
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: pgadmin
+        name: pgadmin4
+    spec:
+      securityContext:
+        fsGroup: 50
+      imagePullSecrets:
+      - name: direction-registry
+      containers:
+      - name: pgadmin4
+        imagePullPolicy: Always
+        image: chorss/docker-pgadmin4
+        resources:
+          limits:
+            cpu: 1
+            memory: 1024Mi
+          requests:
+            cpu: 200m
+            memory: 1024Mi
+        ports:
+        - containerPort: 5050
+        volumeMounts:
+        - name: pgadmin-data
+          mountPath: /data
+          subPath: data
+        envFrom:
+        - configMapRef:
+            name: pgadmin-env
+      - name: pgadmin-files
+        imagePullPolicy: Always
+        image: hacdias/filemanager
+        resources:
+          limits:
+            cpu: 1
+            memory: 1024Mi
+          requests:
+            cpu: 200m
+            memory: 1024Mi
+        args:
+        - --config
+        - /srv/config/filemanager.json
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: pgadmin-data
+          mountPath: /srv
+          subPath: data
+        envFrom:
+        - configMapRef:
+            name: pgadmin-env
+  volumeClaimTemplates:
+  - metadata:
+      name: pgadmin-data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 512Mi
+      storageClassName: rook-block
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgadmin4
+  namespace: databases
+  labels:
+    app: pgadmin
+    name: pgadmin4
+spec:
+  selector:
+    name: pgadmin4
+  ports:
+  - port: 5050
+    targetPort: 5050
+    name: pgadmin4-http
+  - port: 80
+    targetPort: 80
+    name: pgadmin-files-http
+  type: LoadBalancer
