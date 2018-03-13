@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: plex-config-pv-claim
+  namespace: media
+  labels:
+    k8s-app: plex
+spec:
+  storageClassName: rook-block
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: plex
+  namespace: media
+  labels:
+    k8s-app: plex
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        k8s-app: plex
+    spec:
+      hostNetwork: true
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            preference:
+              matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                - kubeworker
+      containers:
+      - name: plex
+        image: linuxserver/plex:117
+        env:
+        - name: PUID
+          value: "0"
+        - name: PGID
+          value: "0"
+        ports:
+        - containerPort: 8989
+          name: ui
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /data/movies
+          name: movies
+        - mountPath: /data/tvshows
+          name: tv
+        - mountPath: /transcode
+          name: transcode
+        - mountPath: /config
+          name: config
+      volumes:
+      - name: movies
+        hostPath:
+          path: "/mnt/media/movies"
+      - name: tv
+        hostPath:
+          path: "/mnt/media/tv"
+      - name: transcode
+        hostPath:
+          path: "/mnt/media/transcode"
+      - name: config
+        persistentVolumeClaim:
+          claimName: plex-config-pv-claim

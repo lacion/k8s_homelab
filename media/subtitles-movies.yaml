@@ -1,0 +1,35 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: subliminal-movies
+  namespace: media
+  labels:
+    k8s-app: subliminal-movies
+spec:
+  successfulJobsHistoryLimit: 10
+  failedJobsHistoryLimit: 10
+  schedule: 30 * * * *
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          nodeSelector:
+            kubernetes.io/hostname: kubeworker
+          containers:
+          - name: subliminal-movies
+            image: diaoulael/subliminal
+            args:
+            args: ["download", "-l", "en", "-l", "es", "/tvshows"]    
+            volumeMounts:
+              - name: tv
+                mountPath: /tvshows
+              - name: cache
+                mountPath: subliminal_cache
+          volumes:
+            - name: tv
+              hostPath:
+                path: "/mnt/media/movies"
+            - name: cache
+              hostPath:
+                path: "/usr/src/cache"
+          restartPolicy: OnFailure

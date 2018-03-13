@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: curator-config
-  namespace: elasticsearch
+  namespace: kube-system
   labels:
     k8s-app: elasticsearch-curator
 data:

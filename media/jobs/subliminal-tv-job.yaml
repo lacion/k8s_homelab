@@ -1,0 +1,30 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  # Unique key of the Job instance
+  name: subliminal-tv-job
+  namespace: media
+spec:
+  template:
+    metadata:
+      name: subliminal-tv-job
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: kubeworker
+      containers:
+      - name: subliminal-tv-job
+        image: diaoulael/subliminal
+        args: ["download", "-l", "en", "-l", "es", "/tvshows"]
+        volumeMounts:
+        - name: tv
+          mountPath: /tvshows
+        - name: cache
+          mountPath: subliminal_cache
+      restartPolicy: Never
+      volumes:
+      - name: tv
+        hostPath:
+          path: "/mnt/media/tv"
+      - name: cache
+        hostPath:
+          path: "/usr/src/cache"

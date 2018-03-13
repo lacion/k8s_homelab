@@ -1,0 +1,115 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: transmission-config-pv-claim
+  namespace: media
+  labels:
+    k8s-app: transmission
+spec:
+  storageClassName: rook-block
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: transmission
+  namespace: media
+  labels:
+    k8s-app: transmission
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        k8s-app: transmission
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            preference:
+              matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                - kubeworker
+      containers:
+      - name: transmission
+        image: linuxserver/transmission:114
+        env:
+        - name: PUID
+          value: "0"
+        - name: PGID
+          value: "0"
+        ports:
+        - containerPort: 9091
+          name: rcp-port
+          protocol: TCP
+        - containerPort: 51413
+          name: peer-port-tcp
+          protocol: TCP
+        - containerPort: 51413
+          name: peer-port-udp
+          protocol: UDP
+        volumeMounts:
+        - mountPath: /downloads
+          name: download
+        - mountPath: /watch 
+          name: watch
+        - mountPath: /config 
+          name: config 
+      volumes:
+      - name: download
+        hostPath:
+          path: "/mnt/media/downloads"
+      - name: watch
+        hostPath:
+          path: "/mnt/media/watch"
+      - name: config
+        persistentVolumeClaim:
+          claimName: transmission-config-pv-claim
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: transmission-tcp
+  namespace: media
+  labels:
+    k8s-app: transmission
+    addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/name: "Transmission"
+spec:
+  ports:
+  - port: 9091
+    name: rpc
+    protocol: TCP
+    targetPort: rcp-port
+  - port: 51413
+    name: peer
+    targetPort: peer-port-tcp
+    protocol: TCP
+  selector:
+    k8s-app: transmission
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: transmission-udp
+  namespace: media
+  labels:
+    k8s-app: transmission
+    addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/name: "Transmission"
+spec:
+  ports:
+  - port: 51413
+    protocol: UDP
+    targetPort: peer-port-udp
+  selector:
+    k8s-app: transmission
+  type: LoadBalancer
